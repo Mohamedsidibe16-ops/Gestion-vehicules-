@@ -7,17 +7,8 @@
 </head>
 <body>
 <script>
-const token = new URLSearchParams(location.search).get("token");
-
-if (token) {
-  location.replace(
-    "https://jnuzpdljawgoznxmyehm.supabase.co/functions/v1/vehicle-qr?token="
-    + encodeURIComponent(token)
-  );
-} else {
-  document.body.innerHTML =
-    "<h2 style='text-align:center'>QR code invalide</h2>";
-}
+const token=new URLSearchParams(location.search).get("token");
+location.href="https://jnuzpdljawgoznxmyehm.supabase.co/functions/v1/vehicle-qr?token="+encodeURIComponent(token);
 </script>
 </body>
 </html>
