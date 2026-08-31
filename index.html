@@ -281,17 +281,32 @@ async function borrowVehicle(event) {
 
   try {
 
-    await supabase("/rest/v1/rpc/borrow_vehicle", {
-      method: "POST",
-      body: JSON.stringify({
-        p_qr_token: token,
-        p_first_name: document.getElementById("firstName").value,
-        p_last_name: document.getElementById("lastName").value
-      })
-    });
+    const response = await fetch(
+      SUPABASE_URL + "/functions/v1/vehicle-action",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          action: "borrow",
+          token: token,
+          first_name: document.getElementById("firstName").value,
+          last_name: document.getElementById("lastName").value
+        })
+      }
+    );
+
+    const result = await response.json();
+
+    if (!response.ok || !result.ok) {
+      throw new Error(
+        result.error || "Impossible d'enregistrer l'emprunt."
+      );
+    }
 
     showMessage(
-      "✅ Véhicule pris avec succès.",
+      "✅ Véhicule pris avec succès. Un e-mail a été envoyé.",
       false
     );
 
@@ -305,17 +320,29 @@ async function borrowVehicle(event) {
     button.textContent = "Prendre le véhicule";
   }
 }
-
 async function returnVehicle() {
 
   try {
 
-    await supabase("/rest/v1/rpc/return_vehicle", {
-      method: "POST",
-      body: JSON.stringify({
-        p_qr_token: token
-      })
-    });
+    const response = await fetch(
+      SUPABASE_URL + "/functions/v1/vehicle-action",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          action: "return",
+          token: token
+        })
+      }
+    );
+
+    const result = await response.json();
+
+    if (!response.ok || !result.ok) {
+      throw new Error(result.error || "Impossible de retourner le véhicule.");
+    }
 
     showMessage(
       "✅ Véhicule retourné avec succès.",
@@ -329,7 +356,6 @@ async function returnVehicle() {
     showMessage(error.message, true);
   }
 }
-
 function showMessage(text, error) {
 
   message.textContent = text;
