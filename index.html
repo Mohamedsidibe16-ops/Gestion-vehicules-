@@ -2,13 +2,345 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Gestion véhicules</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gestion véhicule</title>
+
+<style>
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: linear-gradient(135deg, #eef2ff, #f8fafc);
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  color: #111827;
+}
+
+.card {
+  width: 100%;
+  max-width: 430px;
+  background: white;
+  border-radius: 28px;
+  padding: 30px 24px;
+  box-shadow: 0 20px 50px rgba(0,0,0,.12);
+}
+
+.car {
+  font-size: 58px;
+  text-align: center;
+  margin-bottom: 10px;
+}
+
+h1 {
+  text-align: center;
+  margin: 0;
+  font-size: 29px;
+}
+
+.subtitle {
+  text-align: center;
+  color: #6b7280;
+  margin: 8px 0 22px;
+}
+
+.status {
+  text-align: center;
+  padding: 12px;
+  border-radius: 14px;
+  font-weight: 700;
+  margin-bottom: 24px;
+  background: #dcfce7;
+  color: #166534;
+}
+
+.status.borrowed {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+label {
+  display: block;
+  font-weight: 600;
+  margin-top: 15px;
+}
+
+input {
+  width: 100%;
+  padding: 15px;
+  margin-top: 7px;
+  border: 1px solid #d1d5db;
+  border-radius: 13px;
+  font-size: 17px;
+}
+
+button {
+  width: 100%;
+  border: 0;
+  border-radius: 14px;
+  padding: 16px;
+  margin-top: 22px;
+  font-size: 17px;
+  font-weight: 700;
+  cursor: pointer;
+  background: #111827;
+  color: white;
+}
+
+button:disabled {
+  opacity: .6;
+}
+
+.return {
+  background: #e5e7eb;
+  color: #111827;
+}
+
+.message {
+  margin-top: 18px;
+  padding: 13px;
+  border-radius: 12px;
+  text-align: center;
+  display: none;
+}
+
+.error {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.success {
+  background: #dcfce7;
+  color: #166534;
+}
+</style>
 </head>
+
 <body>
+
+<div class="card">
+
+  <div class="car">🚗</div>
+
+  <h1 id="vehicleName">Renault ZOE</h1>
+
+  <div class="subtitle">
+    Gestion des emprunts
+  </div>
+
+  <div id="status" class="status">
+    Chargement...
+  </div>
+
+  <div id="content"></div>
+
+  <div id="message" class="message"></div>
+
+</div>
+
 <script>
-const token=new URLSearchParams(location.search).get("token");
-location.href="https://jnuzpdljawgoznxmyehm.supabase.co/functions/v1/vehicle-qr?token="+encodeURIComponent(token);
+const SUPABASE_URL = "https://jnuzpdljawgoznxmyehm.supabase.co";
+
+const SUPABASE_KEY = "sb_publishable_nQTVujJC9UE1iY2RREITgQ_G70n7nIv";
+
+const params = new URLSearchParams(window.location.search);
+const token = params.get("token");
+
+const statusBox = document.getElementById("status");
+const content = document.getElementById("content");
+const message = document.getElementById("message");
+
+async function supabase(path, options = {}) {
+
+  const response = await fetch(SUPABASE_URL + path, {
+    ...options,
+    headers: {
+      "apikey": SUPABASE_KEY,
+      "Authorization": "Bearer " + SUPABASE_KEY,
+      "Content-Type": "application/json",
+      ...(options.headers || {})
+    }
+  });
+
+  const text = await response.text();
+
+  let data = null;
+
+  try {
+    data = JSON.parse(text);
+  } catch {
+    data = text;
+  }
+
+  if (!response.ok) {
+    throw new Error(
+      data?.message ||
+      data?.hint ||
+      data?.error_description ||
+      "Une erreur est survenue."
+    );
+  }
+
+  return data;
+}
+
+async function loadVehicle() {
+
+  if (!token) {
+    statusBox.textContent = "QR code invalide";
+    statusBox.className = "status borrowed";
+    return;
+  }
+
+  try {
+
+    const vehicles = await supabase(
+      "/rest/v1/vehicles?select=id,name,status,qr_token&qr_token=eq." +
+      encodeURIComponent(token)
+    );
+
+    if (!vehicles.length) {
+      throw new Error("Véhicule introuvable.");
+    }
+
+    const vehicle = vehicles[0];
+
+    document.getElementById("vehicleName").textContent = vehicle.name;
+
+    if (vehicle.status === "available") {
+
+      statusBox.textContent = "🟢 Véhicule disponible";
+      statusBox.className = "status";
+
+      content.innerHTML = `
+        <form id="borrowForm">
+
+          <label>
+            Prénom
+            <input
+              id="firstName"
+              required
+              autocomplete="given-name"
+              placeholder="Votre prénom">
+          </label>
+
+          <label>
+            Nom
+            <input
+              id="lastName"
+              required
+              autocomplete="family-name"
+              placeholder="Votre nom">
+          </label>
+
+          <button type="submit">
+            Prendre le véhicule
+          </button>
+
+        </form>
+      `;
+
+      document
+        .getElementById("borrowForm")
+        .addEventListener("submit", borrowVehicle);
+
+    } else {
+
+      statusBox.textContent = "🔴 Véhicule actuellement emprunté";
+      statusBox.className = "status borrowed";
+
+      content.innerHTML = `
+        <button class="return" onclick="returnVehicle()">
+          Retourner le véhicule
+        </button>
+      `;
+    }
+
+  } catch (error) {
+
+    statusBox.textContent = "Erreur";
+    statusBox.className = "status borrowed";
+
+    showMessage(error.message, true);
+  }
+}
+
+async function borrowVehicle(event) {
+
+  event.preventDefault();
+
+  const button = event.target.querySelector("button");
+
+  button.disabled = true;
+  button.textContent = "Enregistrement...";
+
+  try {
+
+    await supabase("/rest/v1/rpc/borrow_vehicle", {
+      method: "POST",
+      body: JSON.stringify({
+        p_qr_token: token,
+        p_first_name: document.getElementById("firstName").value,
+        p_last_name: document.getElementById("lastName").value
+      })
+    });
+
+    showMessage(
+      "✅ Véhicule pris avec succès.",
+      false
+    );
+
+    setTimeout(loadVehicle, 800);
+
+  } catch (error) {
+
+    showMessage(error.message, true);
+
+    button.disabled = false;
+    button.textContent = "Prendre le véhicule";
+  }
+}
+
+async function returnVehicle() {
+
+  try {
+
+    await supabase("/rest/v1/rpc/return_vehicle", {
+      method: "POST",
+      body: JSON.stringify({
+        p_qr_token: token
+      })
+    });
+
+    showMessage(
+      "✅ Véhicule retourné avec succès.",
+      false
+    );
+
+    setTimeout(loadVehicle, 800);
+
+  } catch (error) {
+
+    showMessage(error.message, true);
+  }
+}
+
+function showMessage(text, error) {
+
+  message.textContent = text;
+  message.className =
+    "message " + (error ? "error" : "success");
+
+  message.style.display = "block";
+}
+
+loadVehicle();
 </script>
+
 </body>
 </html>
